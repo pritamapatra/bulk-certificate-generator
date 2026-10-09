@@ -1,10 +1,21 @@
+import os
+import uuid
 from datetime import date
 
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.pdfgen import canvas
 
+from app.config import GENERATED_DIR
+
+
+def build_output_path(job_id: str, cert_id: str) -> str:
+    job_part = str(uuid.UUID(job_id))
+    cert_part = str(uuid.UUID(cert_id))
+    return os.path.join(GENERATED_DIR, job_part, f"{cert_part}.pdf")
+
 
 def generate_certificate(name: str, event: str, issue_date: date, out_path: str) -> None:
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     width, height = landscape(A4)
     c = canvas.Canvas(out_path, pagesize=(width, height))
 
