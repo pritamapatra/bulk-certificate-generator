@@ -52,3 +52,13 @@ def process_job(db: Session, job_id: str) -> None:
         job.status = "FAILED"
     job.completed_at = datetime.now(timezone.utc)
     db.commit()
+
+
+def run_job_in_background(job_id: str) -> None:
+    from app.db import SessionLocal
+
+    db = SessionLocal()
+    try:
+        process_job(db, job_id)
+    finally:
+        db.close()
