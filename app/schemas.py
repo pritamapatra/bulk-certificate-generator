@@ -17,3 +17,25 @@ class JobCreate(BaseModel):
     event_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=150)]
     issue_date: date
     recipients: Annotated[list[dict[str, Any]], Field(min_length=1, max_length=MAX_RECIPIENTS)]
+
+
+class JobCreatedOut(BaseModel):
+    job_id: str
+    status: str
+    total: int
+
+
+class CertificateOut(BaseModel):
+    id: str
+    name: str
+    status: str
+    error: str | None = None
+
+
+class JobStatusOut(BaseModel):
+    job_id: str
+    status: str
+    total: int
+    succeeded: int
+    failed: int
+    items: list[CertificateOut]
