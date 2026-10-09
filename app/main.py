@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app import models  # noqa: F401
+from app.api.routes import router
 from app.db import Base, engine
 
 
@@ -14,6 +15,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Bulk Certificate Generator", lifespan=lifespan)
+
+
+app.include_router(router)
 
 
 @app.get("/health")
