@@ -17,6 +17,7 @@ def create_job(payload: JobCreate, db: Session = Depends(get_db)) -> JobCreatedO
         issue_date=payload.issue_date,
         status="PENDING",
         total=len(payload.recipients),
+        failed=len(invalid),
     )
     db.add(job)
     db.flush()
