@@ -1,5 +1,10 @@
 # Bulk Certificate Generator
 
+- Live API: https://bulk-certificate-generator-a6at.onrender.com
+- Interactive docs: https://bulk-certificate-generator-a6at.onrender.com/docs
+
+The free Render instance sleeps when idle, so the first request can take 30 to 60 seconds.
+
 A backend API that accepts a list of recipients in one request, generates a PDF certificate for each valid recipient in the background, tracks job progress, and lets clients download certificates individually or as a ZIP.
 
 ## Setup
