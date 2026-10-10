@@ -13,6 +13,7 @@
     button { margin-top: 1rem; padding: .5rem 1rem; font: inherit; cursor: pointer; }
     #result { margin-top: 1rem; font-weight: 600; word-break: break-all; }
     #result.error { color: #b00020; }
+    progress { width: 100%; height: 1.25rem; }
     .hint { color: #666; font-size: .875rem; margin-top: .25rem; }
   </style>
 </head>
@@ -34,6 +35,8 @@
       <button type="submit" id="submit-btn">Generate certificates</button>
     </form>
     <p id="result" role="status"></p>
+    <progress id="progress" max="100" value="0" hidden></progress>
+    <p id="status-text"></p>
   </main>
 
   <script>
@@ -72,12 +75,52 @@
       return "Request failed (" + status + ")";
     }
 
+    const TERMINAL = ["COMPLETED", "COMPLETED_WITH_ERRORS", "FAILED"];
+    let pollToken = 0;
+
+    function startPolling(jobId) {
+      const token = ++pollToken;
+      const bar = document.getElementById("progress");
+      const text = document.getElementById("status-text");
+      let errors = 0;
+      bar.hidden = false;
+      bar.value = 0;
+
+      async function tick() {
+        if (token !== pollToken) return;
+        try {
+          const resp = await fetch("/api/v1/jobs/" + jobId);
+          if (!resp.ok) throw new Error("status " + resp.status);
+          const job = await resp.json();
+          if (token !== pollToken) return;
+          errors = 0;
+          const done = job.succeeded + job.failed;
+          const pct = job.total > 0 ? Math.round((done / job.total) * 100) : 0;
+          const terminal = TERMINAL.indexOf(job.status) !== -1;
+          bar.value = terminal ? 100 : pct;
+          text.textContent = job.status + ": " + job.succeeded + " succeeded, " + job.failed + " failed of " + job.total;
+          if (terminal) return;
+        } catch (err) {
+          errors += 1;
+          if (errors >= 5) {
+            text.textContent = "Lost contact with the server. Reload to check the job.";
+            return;
+          }
+        }
+        setTimeout(tick, 2000);
+      }
+      tick();
+    }
+
     document.getElementById("job-form").addEventListener("submit", async function (e) {
       e.preventDefault();
       const result = document.getElementById("result");
       const btn = document.getElementById("submit-btn");
       result.className = "";
       result.textContent = "Submitting...";
+      pollToken += 1;
+      document.getElementById("progress").hidden = true;
+      document.getElementById("status-text").textContent = "";
       btn.disabled = true;
       try {
         const resp = await fetch("/api/v1/jobs", {
@@ -93,6 +136,7 @@
         try { body = await resp.json(); } catch (_) {}
         if (resp.ok) {
           result.textContent = "Job created: " + body.job_id + " (" + body.total + " recipients)";
+          startPolling(body.job_id);
         } else {
           result.className = "error";
           result.textContent = errorText(body, resp.status);
