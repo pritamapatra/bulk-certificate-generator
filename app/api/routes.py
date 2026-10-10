@@ -1,9 +1,11 @@
+import csv
 import io
 import os
 import zipfile
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -17,12 +19,10 @@ from app.services.validation import validate_recipients
 router = APIRouter(prefix="/api/v1", tags=["jobs"])
 
 
-@router.post("/jobs", status_code=202, response_model=JobCreatedOut)
-@limiter.limit("10/minute")
-def create_job(
-    request: Request,
-    payload: JobCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
-) -> JobCreatedOut:
+MAX_CSV_BYTES = 1_000_000
+
+
+def _create_job(db: Session, background_tasks: BackgroundTasks, payload: JobCreate) -> JobCreatedOut:
     valid, invalid = validate_recipients(payload.recipients)
     job = Job(
         event_name=payload.event_name,
@@ -48,6 +48,53 @@ def create_job(
     db.commit()
     background_tasks.add_task(run_job_in_background, job.id)
     return JobCreatedOut(job_id=job.id, status=job.status, total=job.total)
+
+
+@router.post("/jobs", status_code=202, response_model=JobCreatedOut)
+@limiter.limit("10/minute")
+def create_job(
+    request: Request,
+    payload: JobCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+) -> JobCreatedOut:
+    return _create_job(db, background_tasks, payload)
+
+
+@router.post("/jobs/upload", status_code=202, response_model=JobCreatedOut)
+@limiter.limit("10/minute")
+def upload_job(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    event_name: str = Form(...),
+    issue_date: str = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> JobCreatedOut:
+    raw = file.file.read(MAX_CSV_BYTES + 1)
+    if len(raw) > MAX_CSV_BYTES:
+        raise HTTPException(status_code=413, detail="CSV file is too large")
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=422, detail="CSV must be UTF-8 encoded")
+    try:
+        reader = csv.DictReader(io.StringIO(text))
+        headers = {(h or "").strip().lower() for h in (reader.fieldnames or [])}
+        if not {"name", "email"} <= headers:
+            raise HTTPException(status_code=422, detail="CSV must have name and email columns")
+        rows = []
+        for rec in reader:
+            norm = {(k or "").strip().lower(): v for k, v in rec.items() if k is not None}
+            rows.append({"name": norm.get("name") or "", "email": norm.get("email") or ""})
+    except csv.Error:
+        raise HTTPException(status_code=422, detail="CSV could not be parsed")
+    try:
+        payload = JobCreate(event_name=event_name, issue_date=issue_date, recipients=rows)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=exc.errors(include_url=False, include_context=False, include_input=False),
+        )
+    return _create_job(db, background_tasks, payload)
 
 
 @router.get("/jobs/{job_id}", response_model=JobStatusOut)
