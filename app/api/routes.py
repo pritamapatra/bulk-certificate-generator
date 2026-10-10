@@ -1,9 +1,9 @@
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models import Certificate, Job
-from app.schemas import JobCreatedOut, JobCreate
+from app.schemas import CertificateOut, JobCreatedOut, JobCreate, JobStatusOut
 from app.services.jobs import run_job_in_background
 from app.services.validation import validate_recipients
 
@@ -39,3 +39,19 @@ def create_job(
     db.commit()
     background_tasks.add_task(run_job_in_background, job.id)
     return JobCreatedOut(job_id=job.id, status=job.status, total=job.total)
+
+
+@router.get("/jobs/{job_id}", response_model=JobStatusOut)
+def get_job(job_id: str, db: Session = Depends(get_db)) -> JobStatusOut:
+    job = db.get(Job, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    certs = sorted(job.certificates, key=lambda c: c.created_at)
+    return JobStatusOut(
+        job_id=job.id,
+        status=job.status,
+        total=job.total,
+        succeeded=job.succeeded,
+        failed=job.failed,
+        items=[CertificateOut(id=c.id, name=c.recipient_name, status=c.status, error=c.error) for c in certs],
+    )
