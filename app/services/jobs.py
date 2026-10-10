@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from app.config import PUBLIC_BASE_URL
 from app.models import Certificate, Job
 from app.services import pdf
 
@@ -12,7 +13,10 @@ logger = logging.getLogger(__name__)
 def process_certificate(db: Session, cert: Certificate) -> bool:
     try:
         path = pdf.build_output_path(cert.job_id, cert.id)
-        pdf.generate_certificate(cert.recipient_name, cert.job.event_name, cert.job.issue_date, path)
+        verify_url = f"{PUBLIC_BASE_URL.rstrip('/')}/verify/{cert.verification_code}"
+        pdf.generate_certificate(
+            cert.recipient_name, cert.job.event_name, cert.job.issue_date, path, verify_url=verify_url
+        )
         cert.status = "SUCCESS"
         cert.file_path = path
         cert.error = None

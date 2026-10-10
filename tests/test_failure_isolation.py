@@ -4,10 +4,10 @@ from app.services import pdf
 def test_one_failure_does_not_block_others(client, monkeypatch):
     real = pdf.generate_certificate
 
-    def flaky(name, event, issue_date, out_path):
+    def flaky(name, event, issue_date, out_path, **kwargs):
         if name == "Boom":
             raise RuntimeError("render failed")
-        return real(name, event, issue_date, out_path)
+        return real(name, event, issue_date, out_path, **kwargs)
 
     monkeypatch.setattr(pdf, "generate_certificate", flaky)
 
