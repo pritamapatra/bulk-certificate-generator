@@ -40,3 +40,10 @@ class JobStatusOut(BaseModel):
     succeeded: int
     failed: int
     items: list[CertificateOut]
+
+
+class VerifyOut(BaseModel):
+    name: str
+    event_name: str
+    issue_date: date
+    status: str

@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 from app.limiter import limiter
 
 from app import models  # noqa: F401
-from app.api.routes import router
+from app.api.routes import router, verify_router
 from app.db import Base, engine
 
 
@@ -24,6 +24,7 @@ app = FastAPI(title="Bulk Certificate Generator", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.include_router(router)
+app.include_router(verify_router)
 
 
 @app.get("/health")

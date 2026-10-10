@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.limiter import limiter
 from app.models import Certificate, Job
-from app.schemas import CertificateOut, JobCreatedOut, JobCreate, JobStatusOut
+from app.schemas import CertificateOut, JobCreatedOut, JobCreate, JobStatusOut, VerifyOut
 from app.services.jobs import run_job_in_background
 from app.services.validation import validate_recipients
 
@@ -96,4 +96,20 @@ def download_zip(job_id: str, db: Session = Depends(get_db)) -> Response:
         content=buf.getvalue(),
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{job_id}.zip"'},
+    )
+
+
+verify_router = APIRouter(tags=["verify"])
+
+
+@verify_router.get("/verify/{code}", response_model=VerifyOut)
+def verify_certificate(code: str, db: Session = Depends(get_db)) -> VerifyOut:
+    cert = db.get(Certificate, code)
+    if cert is None or cert.status != "SUCCESS":
+        raise HTTPException(status_code=404, detail="Certificate not found")
+    return VerifyOut(
+        name=cert.recipient_name,
+        event_name=cert.job.event_name,
+        issue_date=cert.job.issue_date,
+        status=cert.status,
     )
