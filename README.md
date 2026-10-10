@@ -115,3 +115,38 @@ Returns a ZIP of every successful PDF (200). Returns 404 if the job has none.
 ### Rate limit
 
 `POST /api/v1/jobs` allows 10 requests per minute per IP. The 11th request returns 429.
+
+## Design decisions
+
+| Decision | Chosen | Why | Revisit when |
+|---|---|---|---|
+| Web framework | FastAPI over Django | Less boilerplate, built-in validation and OpenAPI docs | An admin UI or heavy ORM features are needed |
+| Background work | FastAPI BackgroundTasks over Celery | No extra infrastructure, costs nothing, simple to deploy | Jobs run for minutes or need retries |
+| PDF generation | ReportLab over HTML-to-PDF | Pure Python, no native libraries, easy to deploy on a free host | Designers need rich templates |
+| Access control | No auth, rate limiting instead | The brief has no user accounts; 10 requests per minute per IP limits abuse on a public URL | Multi-user use, or a UI is added |
+| Hosting | Render over Vercel | A long-lived process keeps background tasks and local files working | Moving to object storage and a queue |
+| Database | SQLite locally, Neon Postgres in production | Fast in-memory tests, and a free Postgres that does not expire | Traffic outgrows the free plan |
+| Frontend | None, Swagger UI at /docs | The task is a backend API; this saves time for tests | Self-serve users are needed |
+
+### How processing works
+
+`POST /api/v1/jobs` validates the batch, stores a job and one row per recipient, returns 202, and schedules a background task. The task opens its own database session, processes each certificate inside its own try/except, and commits counters after every item. One failure never stops the rest, and the job always ends in a terminal status.
+
+### Known limitations
+
+- Tasks are lost if the server restarts, and only a single process is supported. A job interrupted mid-run stays in PROCESSING.
+- Render's free disk is ephemeral. Generated PDFs are wiped on redeploy, so old download links can return 404 and certificates must be regenerated.
+- Render's free web service sleeps after 15 minutes idle. The first request afterwards can take 30 to 60 seconds.
+- Rate-limit counters are kept in memory, so they reset on restart and are not shared across processes.
+
+### What I learned
+
+- SQLAlchemy 2.1 maps a bare `postgresql://` URL to the `psycopg` v3 driver. The app rewrites it to `postgresql+psycopg2://` so the installed driver is used.
+- Free managed Postgres has tight limits. Render's expires after 30 days, so Neon is used instead.
+- Always run the server with `python -m uvicorn` inside the virtual environment, so the right interpreter is used.
+
+### Future scope
+
+- Celery or RQ with Redis, or a Postgres-backed queue, for durable and retryable jobs.
+- S3 or Cloudflare R2 for certificate storage that survives redeploys.
+- Per-client API keys, QR verification at `GET /verify/{uuid}`, CSV upload and email delivery.
