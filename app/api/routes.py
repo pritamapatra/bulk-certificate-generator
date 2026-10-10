@@ -1,7 +1,10 @@
+import io
 import os
+import zipfile
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -72,3 +75,22 @@ def download_certificate(job_id: str, cert_id: str, db: Session = Depends(get_db
     ):
         raise HTTPException(status_code=404, detail="Certificate not found")
     return FileResponse(cert.file_path, media_type="application/pdf", filename=f"{cert.id}.pdf")
+
+
+@router.get("/jobs/{job_id}/download")
+def download_zip(job_id: str, db: Session = Depends(get_db)) -> Response:
+    certs = db.scalars(
+        select(Certificate).where(Certificate.job_id == job_id, Certificate.status == "SUCCESS")
+    ).all()
+    files = [c for c in certs if c.file_path and os.path.isfile(c.file_path)]
+    if not files:
+        raise HTTPException(status_code=404, detail="No certificates available")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for c in files:
+            zf.write(c.file_path, arcname=f"{c.id}.pdf")
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{job_id}.zip"'},
+    )
