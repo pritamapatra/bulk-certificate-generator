@@ -1,4 +1,7 @@
+import os
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -55,3 +58,17 @@ def get_job(job_id: str, db: Session = Depends(get_db)) -> JobStatusOut:
         failed=job.failed,
         items=[CertificateOut(id=c.id, name=c.recipient_name, status=c.status, error=c.error) for c in certs],
     )
+
+
+@router.get("/jobs/{job_id}/certificates/{cert_id}")
+def download_certificate(job_id: str, cert_id: str, db: Session = Depends(get_db)) -> FileResponse:
+    cert = db.get(Certificate, cert_id)
+    if (
+        cert is None
+        or cert.job_id != job_id
+        or cert.status != "SUCCESS"
+        or not cert.file_path
+        or not os.path.isfile(cert.file_path)
+    ):
+        raise HTTPException(status_code=404, detail="Certificate not found")
+    return FileResponse(cert.file_path, media_type="application/pdf", filename=f"{cert.id}.pdf")
