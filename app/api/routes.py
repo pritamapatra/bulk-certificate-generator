@@ -2,12 +2,13 @@ import io
 import os
 import zipfile
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.limiter import limiter
 from app.models import Certificate, Job
 from app.schemas import CertificateOut, JobCreatedOut, JobCreate, JobStatusOut
 from app.services.jobs import run_job_in_background
@@ -17,7 +18,9 @@ router = APIRouter(prefix="/api/v1", tags=["jobs"])
 
 
 @router.post("/jobs", status_code=202, response_model=JobCreatedOut)
+@limiter.limit("10/minute")
 def create_job(
+    request: Request,
     payload: JobCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ) -> JobCreatedOut:
     valid, invalid = validate_recipients(payload.recipients)
