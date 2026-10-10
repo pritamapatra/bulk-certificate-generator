@@ -14,6 +14,10 @@
     #result { margin-top: 1rem; font-weight: 600; word-break: break-all; }
     #result.error { color: #b00020; }
     progress { width: 100%; height: 1.25rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: .9rem; }
+    th, td { text-align: left; padding: .4rem; border-bottom: 1px solid #ddd; }
+    td.FAILED { color: #b00020; }
+    td.SUCCESS { color: #1b7f3b; }
     .hint { color: #666; font-size: .875rem; margin-top: .25rem; }
   </style>
 </head>
@@ -37,6 +41,11 @@
     <p id="result" role="status"></p>
     <progress id="progress" max="100" value="0" hidden></progress>
     <p id="status-text"></p>
+    <p id="download-all" hidden><a id="zip-link" href="#">Download all (ZIP)</a></p>
+    <table id="results" hidden>
+      <thead><tr><th>Name</th><th>Status</th><th>Error</th><th>PDF</th></tr></thead>
+      <tbody></tbody>
+    </table>
   </main>
 
   <script>
@@ -75,6 +84,38 @@
       return "Request failed (" + status + ")";
     }
 
+    function cell(text, cls) {
+      const td = document.createElement("td");
+      td.textContent = text;
+      if (cls) td.className = cls;
+      return td;
+    }
+
+    function renderResults(job, terminal) {
+      const table = document.getElementById("results");
+      const body = table.querySelector("tbody");
+      body.textContent = "";
+      job.items.forEach(function (item) {
+        const tr = document.createElement("tr");
+        tr.appendChild(cell(item.name));
+        tr.appendChild(cell(item.status, item.status));
+        tr.appendChild(cell(item.error || ""));
+        const linkCell = document.createElement("td");
+        if (item.status === "SUCCESS") {
+          const a = document.createElement("a");
+          a.href = "/api/v1/jobs/" + job.job_id + "/certificates/" + item.id;
+          a.textContent = "PDF";
+          linkCell.appendChild(a);
+        }
+        tr.appendChild(linkCell);
+        body.appendChild(tr);
+      });
+      table.hidden = job.items.length === 0;
+      const zip = document.getElementById("download-all");
+      zip.hidden = !(terminal && job.succeeded > 0);
+      document.getElementById("zip-link").href = "/api/v1/jobs/" + job.job_id + "/download";
+    }
+
     const TERMINAL = ["COMPLETED", "COMPLETED_WITH_ERRORS", "FAILED"];
     let pollToken = 0;
 
@@ -99,6 +140,7 @@
           const terminal = TERMINAL.indexOf(job.status) !== -1;
           bar.value = terminal ? 100 : pct;
           text.textContent = job.status + ": " + job.succeeded + " succeeded, " + job.failed + " failed of " + job.total;
+          renderResults(job, terminal);
           if (terminal) return;
         } catch (err) {
           errors += 1;
@@ -121,6 +163,8 @@
       pollToken += 1;
       document.getElementById("progress").hidden = true;
       document.getElementById("status-text").textContent = "";
+      document.getElementById("results").hidden = true;
+      document.getElementById("download-all").hidden = true;
       btn.disabled = true;
       try {
         const resp = await fetch("/api/v1/jobs", {

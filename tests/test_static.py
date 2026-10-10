@@ -7,5 +7,5 @@ def test_index_page_loads(client):
 
 def test_index_has_form_controls(client):
     html = client.get("/").text
-    for element_id in ("event-name", "issue-date", "recipients", "sample-btn", "submit-btn", "result", "progress"):
+    for element_id in ("event-name", "issue-date", "recipients", "sample-btn", "submit-btn", "result", "progress", "results", "zip-link"):
         assert f'id="{element_id}"' in html
