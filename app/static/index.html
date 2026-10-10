@@ -4,11 +4,49 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Bulk Certificate Generator</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #f5f6f8; margin: 0; padding: 2rem 1rem; color: #1a1a1a; }
+    main { max-width: 640px; margin: 0 auto; background: #fff; padding: 1.5rem 2rem; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+    label { display: block; margin-top: 1rem; font-weight: 600; }
+    input, textarea { width: 100%; box-sizing: border-box; padding: .5rem; margin-top: .25rem; font: inherit; border: 1px solid #bbb; border-radius: 4px; }
+    textarea { min-height: 180px; font-family: ui-monospace, monospace; }
+    button { margin-top: 1rem; padding: .5rem 1rem; font: inherit; cursor: pointer; }
+    .hint { color: #666; font-size: .875rem; margin-top: .25rem; }
+  </style>
 </head>
 <body>
   <main>
     <h1>Bulk Certificate Generator</h1>
-    <p>Upload a CSV of names and emails to generate certificates.</p>
+    <form id="job-form">
+      <label for="event-name">Event name</label>
+      <input id="event-name" name="event_name" type="text" maxlength="150" required>
+
+      <label for="issue-date">Issue date</label>
+      <input id="issue-date" name="issue_date" type="date" required>
+
+      <label for="recipients">Recipients</label>
+      <textarea id="recipients" name="recipients" placeholder="Asha Rao,asha@example.com"></textarea>
+      <div class="hint">One recipient per line: name,email</div>
+
+      <button type="button" id="sample-btn">Fill sample data</button>
+    </form>
   </main>
+
+  <script>
+    const SAMPLE = [
+      "Asha Rao,asha@example.com",
+      "Ravi Kumar,ravi@example.com",
+      "Meera Das,meera@example.com",
+      "Karan Shah,not-an-email"
+    ].join("\n");
+
+    document.getElementById("issue-date").value = new Date().toISOString().slice(0, 10);
+
+    document.getElementById("sample-btn").addEventListener("click", function () {
+      document.getElementById("recipients").value = SAMPLE;
+      const ev = document.getElementById("event-name");
+      if (!ev.value) ev.value = "PyData Workshop";
+    });
+  </script>
 </body>
 </html>
