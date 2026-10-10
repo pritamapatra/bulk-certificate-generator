@@ -46,3 +46,7 @@ class Certificate(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     job: Mapped["Job"] = relationship(back_populates="certificates")
+
+    @property
+    def verification_code(self) -> str:
+        return self.id

@@ -27,6 +27,7 @@ class JobCreatedOut(BaseModel):
 
 class CertificateOut(BaseModel):
     id: str
+    verify_code: str
     name: str
     status: str
     error: str | None = None

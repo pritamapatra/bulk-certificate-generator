@@ -62,7 +62,7 @@ def get_job(job_id: str, db: Session = Depends(get_db)) -> JobStatusOut:
         total=job.total,
         succeeded=job.succeeded,
         failed=job.failed,
-        items=[CertificateOut(id=c.id, name=c.recipient_name, status=c.status, error=c.error) for c in certs],
+        items=[CertificateOut(id=c.id, verify_code=c.verification_code, name=c.recipient_name, status=c.status, error=c.error) for c in certs],
     )
 
 
